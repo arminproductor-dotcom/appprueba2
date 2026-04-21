@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Diagrama de Arquitectura CUBI-K</title>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({ 
+    startOnLoad: true, 
+    theme: 'base',
+    themeVariables: {
+      primaryColor: '#0f172a',
+      primaryTextColor: '#f8fafc',
+      primaryBorderColor: '#334155',
+      lineColor: '#94a3b8',
+      secondaryColor: '#1e293b',
+      tertiaryColor: '#020617'
+    },
+    flowchart: { curve: 'basis' }
+  });
+</script>
+<style>
+  body { background-color: #080E1A; color: white; font-family: 'Outfit', sans-serif; display: flex; justify-content: center; padding: 2rem; }
+  .mermaid { width: 100%; max-width: 1200px; }
+</style>
+</head>
+<body>
+
+<div class="mermaid">
+flowchart TB
+    %% Estilos de Nodos
+    classDef canales fill:#0d2818,stroke:#10b981,stroke-width:2px,color:#4ade80,rx:8px,ry:8px
+    classDef eventCore fill:#1a1200,stroke:#ff5a00,stroke-width:2px,color:#ff5a00,rx:8px,ry:8px
+    classDef agent fill:#0d0d2b,stroke:#7c3aed,stroke-width:2px,color:#a78bfa,rx:8px,ry:8px
+    classDef llm fill:#1a1200,stroke:#f59e0b,stroke-width:2px,color:#fcd34d,rx:8px,ry:8px
+    classDef data fill:#0a1a0d,stroke:#059669,stroke-width:2px,color:#34d399,rx:8px,ry:8px
+    classDef itsm fill:#001a33,stroke:#004b87,stroke-width:2px,color:#60a5fa,rx:8px,ry:8px
+    classDef decision fill:#2d1a00,stroke:#ff5a00,stroke-width:2px,color:#ff5a00
+    classDef area fill:transparent,stroke:#334155,stroke-width:1px,stroke-dasharray: 5 5,color:#8b9dc3
+
+    %% 1. Capa de Canales / Monitoreo (Top)
+    subgraph Fuentes ["Canales y Fuentes de Monitoreo"]
+        direction LR
+        N[Nagios Core<br>Servidores, Discos]:::canales
+        D[Dynatrace<br>Apps, K8s, UX]:::canales
+    end
+
+    %% 2. Capa de Entrada de Eventos
+    subgraph Eventos ["Gestión de Eventos"]
+        BMC_Ops[BMC Helix Operations Management<br>Consola de Eventos Centralizada]:::eventCore
+    end
+
+    %% 3. Capa Core de Orquestación (Equivalente al IA Gateway / Azure Cluster)
+    subgraph Orquestador ["Plataforma Multi-Agente I'AM CUBI-K (LangGraph)"]
+        direction TB
+        Clasificador[Agente Clasificador<br>Categoría y Prioridad]:::agent
+        RAG[Agente de Conocimiento<br>Búsqueda de Soluciones]:::agent
+        Asignador[Agente Asignador<br>Turno, Carga y Perfil]:::agent
+        
+        Eval{¿Cumple reglas<br>para Ticket BCI?}:::decision
+        
+        Updater[Agente Actualizador<br>Generador de ITSM]:::agent
+        Notifier[Agente Notificador<br>Slack / Email]:::agent
+        Alt[Medidas Alternativas<br>Acknowledge / Agrupar]:::agent
+        
+        Clasificador --> RAG --> Asignador --> Eval
+        Eval -- SÍ --> Updater
+        Eval -- SÍ --> Notifier
+        Eval -- NO --> Alt
+    end
+
+    %% 4. Capa de Modelos e Infraestructura de Datos (Right/Bottom)
+    subgraph IA_Datos ["Modelos IA y Bases de Datos"]
+        direction TB
+        Gemini[Google Gemini 1.5 Pro<br>LLM Generativo]:::llm
+        VECTORDB[(vecDB<br>Vectores RAG)]:::agent
+        Sheets[(Google Sheets<br>Turnos Apps Script)]:::data
+        Rules[Reglas de Negocio BCI<br>Políticas]:::itsm
+    end
+
+    %% 5. Capa de Sistemas Core / Salida (Bottom)
+    subgraph Destinos ["Sistemas de Terceros e ITSM"]
+        BMC_ITSM[BMC Helix ITSM<br>Ticket Console]:::itsm
+    end
+
+    %% Relaciones Principales
+    N -->|Alertas| BMC_Ops
+    D -->|Alertas| BMC_Ops
+    BMC_Ops -->|Inyección de Eventos JSON| Clasificador
+    
+    Updater -->|API REST| BMC_ITSM
+
+    %% Relaciones de Agentes con Datos (Líneas punteadas)
+    Gemini -.->|Inferencia| Clasificador
+    VECTORDB -.->|Contexto y Perfiles| RAG
+    Sheets -.->|Disponibilidad en vivo| Asignador
+    Rules -.->|Criterios de decisión| Eval
+
+    class Fuentes,Eventos,Orquestador,IA_Datos,Destinos area;
+</div>
+
+</body>
+</html>
